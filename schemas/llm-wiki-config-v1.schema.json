@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llm-wiki.dev/schemas/config-v1.json",
+  "type": "object",
+  "required": ["schema_version", "initialized", "wiki_path", "state_path"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "initialized": { "type": "boolean" },
+    "wiki_path": { "type": "string", "minLength": 1 },
+    "state_path": { "type": "string", "minLength": 1 },
+    "context_budget_bytes": { "type": "integer", "minimum": 1024 },
+    "index_entry_limit": { "type": "integer", "minimum": 10 },
+    "lock_wait_seconds": { "type": "integer", "minimum": 0, "maximum": 60 },
+    "sync_lease_seconds": { "type": "integer", "minimum": 30, "maximum": 3600 },
+    "maintenance": {
+      "type": "object",
+      "required": ["max_recovery_passes"],
+      "properties": {
+        "max_recovery_passes": { "type": "integer", "minimum": 0, "maximum": 3 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
