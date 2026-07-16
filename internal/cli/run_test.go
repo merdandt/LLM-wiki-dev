@@ -114,6 +114,29 @@ func TestRunFingerprintJSONIsDeterministicAndRejectsUnsafeInputs(t *testing.T) {
 	}
 }
 
+func TestRunStatusJSON(t *testing.T) {
+	root := copyCLIFixture(t)
+	initCLIGit(t, root)
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"status", "--root", root, "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	var got struct {
+		Initialized      bool   `json:"initialized"`
+		Schema           int    `json:"schema"`
+		WikiPath         string `json:"wiki_path"`
+		LeaseActive      bool   `json:"sync_lease_active"`
+		ValidationErrors int    `json:"validation_errors"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if !got.Initialized || got.Schema != 1 || got.WikiPath != "docs/llm-wiki" || got.LeaseActive || got.ValidationErrors != 0 {
+		t.Fatalf("unexpected status: %#v", got)
+	}
+}
+
 func copyCLIFixture(t *testing.T) string {
 	t.Helper()
 	source := filepath.Join("..", "..", "testdata", "wiki", "valid")

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,6 +14,8 @@ import (
 	"github.com/merdandt/LLM-wiki-dev/internal/config"
 	"github.com/merdandt/LLM-wiki-dev/internal/fingerprint"
 	"github.com/merdandt/LLM-wiki-dev/internal/gitrepo"
+	"github.com/merdandt/LLM-wiki-dev/internal/lock"
+	"github.com/merdandt/LLM-wiki-dev/internal/state"
 	"github.com/merdandt/LLM-wiki-dev/internal/wiki"
 )
 
@@ -29,10 +32,100 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return runValidate(args[1:], stdout, stderr)
 		case "fingerprint":
 			return runFingerprint(args[1:], stdout, stderr)
+		case "status":
+			return runStatus(args[1:], stdout, stderr)
 		}
 	}
 	fmt.Fprintln(stderr, "usage: llm-wiki <version|validate|status|init|finalize-init|migrate|hook|receipt|plugin>")
 	return 2
+}
+
+type Status struct {
+	Initialized      bool   `json:"initialized"`
+	Schema           int    `json:"schema"`
+	WikiPath         string `json:"wiki_path"`
+	HealthItems      int    `json:"health_items"`
+	ValidationErrors int    `json:"validation_errors"`
+	StartupAudit     bool   `json:"startup_audit"`
+	ContextBudget    int    `json:"context_budget_bytes"`
+	LeaseActive      bool   `json:"sync_lease_active"`
+	LeaseOwner       string `json:"sync_lease_owner,omitempty"`
+	LastReceipt      string `json:"last_receipt_kind,omitempty"`
+}
+
+func runStatus(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	rootFlag := flags.String("root", ".", "Git repository root")
+	jsonFlag := flags.Bool("json", false, "emit JSON")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	repo, err := gitrepo.Discover(*rootFlag)
+	if err != nil {
+		return commandError(stderr, err)
+	}
+	cfg, err := config.Load(filepath.Join(repo.Root, "llm-wiki.yaml"))
+	if err != nil {
+		return commandError(stderr, err)
+	}
+	report := wiki.Validate(wiki.Options{Root: repo.Root, WikiPath: cfg.WikiPath, AllowUninitialized: true, IndexEntryLimit: cfg.IndexEntryLimit})
+	healthItems := 0
+	if data, err := os.ReadFile(filepath.Join(repo.Root, filepath.FromSlash(cfg.WikiPath), "health.md")); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "## ") {
+				healthItems++
+			}
+		}
+	}
+	status := Status{
+		Initialized:      cfg.Initialized,
+		Schema:           cfg.SchemaVersion,
+		WikiPath:         cfg.WikiPath,
+		HealthItems:      healthItems,
+		ValidationErrors: len(report.Errors),
+		ContextBudget:    cfg.ContextBudgetBytes,
+	}
+	worktreeID, err := repo.WorktreeID()
+	if err != nil {
+		return commandError(stderr, err)
+	}
+	layout := state.NewLayout(filepath.Join(repo.Root, cfg.StatePath))
+	if session, err := layout.LatestSession(worktreeID); err == nil {
+		status.StartupAudit = session.StartupAudit
+	}
+	if receipt, err := layout.LatestReceipt(); err == nil {
+		status.LastReceipt = string(receipt.Kind)
+	}
+	owner, err := lock.CurrentOwner(context.Background(), layout.LockPath(worktreeID))
+	if err == nil {
+		status.LeaseActive = true
+		status.LeaseOwner = owner
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return commandError(stderr, err)
+	}
+	if *jsonFlag {
+		encoder := json.NewEncoder(stdout)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(status); err != nil {
+			return commandError(stderr, err)
+		}
+		return 0
+	}
+	lease := "inactive"
+	if status.LeaseActive {
+		lease = "active"
+	}
+	startup := "no"
+	if status.StartupAudit {
+		startup = "yes"
+	}
+	lastReceipt := "none"
+	if status.LastReceipt != "" {
+		lastReceipt = status.LastReceipt
+	}
+	fmt.Fprintf(stdout, "LLM Wiki: ready\nSchema: %d\nHealth items: %d\nValidation errors: %d\nStartup audit: %s\nSync lease: %s\nLast receipt: %s\n", status.Schema, status.HealthItems, status.ValidationErrors, startup, lease, lastReceipt)
+	return 0
 }
 
 func runValidate(args []string, stdout, stderr io.Writer) int {

@@ -1,4 +1,7 @@
-.PHONY: test vet build verify
+.PHONY: fmt test vet build verify
+
+fmt:
+	test -z "$$(gofmt -l cmd internal)"
 
 test:
 	go test ./...
