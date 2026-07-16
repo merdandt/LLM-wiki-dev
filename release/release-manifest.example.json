@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "release_base_url": "https://github.com/merdandt/LLM-wiki-dev/releases/download/v0.1.0",
+  "artifacts": {
+    "darwin-arm64.archive": "llm-wiki-darwin-arm64.tar.gz",
+    "darwin-arm64.sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGEST",
+    "darwin-amd64.archive": "llm-wiki-darwin-amd64.tar.gz",
+    "darwin-amd64.sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGEST",
+    "linux-arm64.archive": "llm-wiki-linux-arm64.tar.gz",
+    "linux-arm64.sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGEST",
+    "linux-amd64.archive": "llm-wiki-linux-amd64.tar.gz",
+    "linux-amd64.sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGEST",
+    "windows-amd64.archive": "llm-wiki-windows-amd64.tar.gz",
+    "windows-amd64.sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGEST"
+  }
+}
