@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llm-wiki.dev/schemas/page-v1.json",
+  "type": "object",
+  "required": ["id", "kind", "status", "summary", "verification", "evidence"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+    "kind": {
+      "enum": ["system", "component", "flow", "contract", "decision", "quality", "operation", "glossary", "health", "index", "log"]
+    },
+    "status": { "enum": ["current", "deprecated", "superseded", "planned"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "verification": {
+      "type": "object",
+      "required": ["base_commit", "evidence_fingerprint"],
+      "properties": {
+        "base_commit": { "type": "string", "minLength": 1 },
+        "evidence_fingerprint": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|uninitialized)$" }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "symbol": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+      "uniqueItems": true
+    },
+    "supersedes": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
