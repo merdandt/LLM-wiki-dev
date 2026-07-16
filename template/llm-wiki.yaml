@@ -1,0 +1,10 @@
+schema_version: 1
+initialized: false
+wiki_path: "{{wiki_path}}"
+state_path: .llm-wiki-state
+context_budget_bytes: {{context_budget_bytes}}
+index_entry_limit: 200
+lock_wait_seconds: 5
+sync_lease_seconds: 600
+maintenance:
+  max_recovery_passes: 1

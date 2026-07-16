@@ -1270,7 +1270,7 @@ Add:
 hook-test:
 	go test ./internal/hook ./internal/materiality ./internal/state
 
-verify: fmt test vet build brick hook-test
+verify: fmt test vet build package hook-test
 ```
 
 Run:

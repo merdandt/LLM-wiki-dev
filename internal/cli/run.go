@@ -14,6 +14,7 @@ import (
 	"github.com/merdandt/LLM-wiki-dev/internal/config"
 	"github.com/merdandt/LLM-wiki-dev/internal/fingerprint"
 	"github.com/merdandt/LLM-wiki-dev/internal/gitrepo"
+	"github.com/merdandt/LLM-wiki-dev/internal/initrepo"
 	"github.com/merdandt/LLM-wiki-dev/internal/lock"
 	"github.com/merdandt/LLM-wiki-dev/internal/state"
 	"github.com/merdandt/LLM-wiki-dev/internal/wiki"
@@ -34,10 +35,27 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return runFingerprint(args[1:], stdout, stderr)
 		case "status":
 			return runStatus(args[1:], stdout, stderr)
+		case "init":
+			return runInit(args[1:], stdout, stderr)
 		}
 	}
 	fmt.Fprintln(stderr, "usage: llm-wiki <version|validate|status|init|finalize-init|migrate|hook|receipt|plugin>")
 	return 2
+}
+
+func runInit(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("init", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	rootFlag := flags.String("root", ".", "Git repository root")
+	templateFlag := flags.String("template", "", "template directory")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if err := initrepo.Initialize(*rootFlag, *templateFlag); err != nil {
+		return commandError(stderr, err)
+	}
+	fmt.Fprintln(stdout, "llm-wiki: initialized repository template")
+	return 0
 }
 
 type Status struct {

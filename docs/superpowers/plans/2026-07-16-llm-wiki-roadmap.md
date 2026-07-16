@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deliver a cross-platform, Mason-initialized, team-shared software-development wiki that Codex and Claude Code maintain autonomously through quiet in-loop hooks.
+**Goal:** Deliver a cross-platform, release-bundle-installed, team-shared software-development wiki that Codex and Claude Code maintain autonomously through quiet in-loop hooks.
 
-**Architecture:** Build one deterministic Go helper, one Mason Brick, four portable Agent Skills, one shared hook configuration, and thin Claude/Codex packaging adapters. Deliver them in five sequential milestones so each milestone leaves a working, tested artifact and establishes the contracts used by the next milestone.
+**Architecture:** Build one deterministic Go helper, one versioned repository template, one HTTPS bootstrap installer, four portable Agent Skills, one shared hook configuration, and thin Claude/Codex packaging adapters. Deliver them in five sequential milestones so each milestone leaves a working, tested artifact and establishes the contracts used by the next milestone.
 
-**Tech Stack:** Go 1.26.5, Dart 3.12.2, Mason CLI 0.1.3, Markdown, YAML, JSON, POSIX shell, PowerShell, GitHub Actions.
+**Tech Stack:** Go 1.26.5, Markdown, YAML, JSON, POSIX shell, PowerShell, GitHub Releases, Cloudflare, GitHub Actions.
 
 ---
 
@@ -20,30 +20,19 @@ If implementation pressure suggests changing an approved product invariant, upda
 
 ## Toolchain preflight
 
-The current workspace does not have a working Go or Dart installation. Before Milestone 1, verify:
+Before Milestone 1, verify:
 
 ```bash
 go version
-dart --version
-mason --version
 ```
 
 Expected versions:
 
 ```text
 go version go1.26.5 ...
-Dart SDK version: 3.12.2 ...
-mason_cli 0.1.3
 ```
 
-On macOS with Homebrew:
-
-```bash
-brew install go
-brew tap dart-lang/dart
-brew install dart
-dart pub global activate mason_cli 0.1.3
-```
+The end-user installer must not require Go, Dart, Mason, or a package manager.
 
 Do not modify the user's uncommitted `README.md` while setting up the toolchain.
 
@@ -132,10 +121,10 @@ The completed source tree should have these responsibilities:
 │   ├── lock/
 │   │   ├── lock.go
 │   │   └── lock_test.go
-│   ├── mason/
-│   │   ├── installer.go
-│   │   ├── runner.go
-│   │   └── mason_test.go
+│   ├── installer/
+│   │   ├── archive.go
+│   │   ├── install.go
+│   │   └── install_test.go
 │   ├── materiality/
 │   │   ├── classify.go
 │   │   └── classify_test.go
@@ -160,18 +149,13 @@ The completed source tree should have these responsibilities:
 ├── schemas/
 │   ├── llm-wiki-config-v1.schema.json
 │   └── llm-wiki-page-v1.schema.json
-├── bricks/
-│   └── software-wiki/
-│       ├── brick.yaml
-│       ├── CHANGELOG.md
-│       ├── LICENSE
-│       ├── README.md
-│       ├── __brick__/
-│       │   ├── llm-wiki.yaml
-│       │   └── {{wiki_path}}/
-│       └── hooks/
-│           ├── pre_gen.dart
-│           └── pubspec.yaml
+├── template/
+│   ├── AGENTS.md
+│   ├── CLAUDE.md
+│   ├── .gitignore.append
+│   ├── llm-wiki.yaml
+│   └── docs/
+│       └── llm-wiki/
 ├── plugins/
 │   └── llm-wiki/
 │       ├── .claude-plugin/
@@ -179,8 +163,7 @@ The completed source tree should have these responsibilities:
 │       ├── .codex-plugin/
 │       │   └── plugin.json
 │       ├── assets/
-│       │   ├── bricks/
-│       │   │   └── software-wiki/
+│       │   ├── template/
 │       │   └── release-checksums.json
 │       ├── bin/
 │       │   ├── darwin-amd64/
@@ -203,11 +186,13 @@ The completed source tree should have these responsibilities:
 │           └── wiki-sync/
 │               └── SKILL.md
 ├── release/
-│   └── plugin-metadata.yaml
+│   ├── install.sh
+│   ├── plugin-metadata.yaml
+│   └── release-manifest.json
 ├── scripts/
 │   ├── acceptance.sh
 │   ├── evaluate-artifacts.sh
-│   ├── package-plugin.sh
+│   ├── package-release.sh
 │   ├── run-agent-evals.sh
 │   └── verify-release.sh
 └── testdata/
@@ -227,6 +212,9 @@ llm-wiki validate [--root PATH] [--allow-uninitialized]
 llm-wiki status [--root PATH] [--json]
 llm-wiki fingerprint --root PATH --page WIKI_PAGE [--json]
 llm-wiki init [--root PATH] [--wiki-path PATH] [--non-interactive]
+llm-wiki update [--root PATH] [--version VERSION]
+llm-wiki doctor [--root PATH]
+llm-wiki uninstall [--root PATH]
 llm-wiki finalize-init [--root PATH]
 llm-wiki migrate [--root PATH]
 llm-wiki hook session-start
@@ -306,25 +294,25 @@ go vet ./...
 go build ./cmd/llm-wiki
 ```
 
-### Milestone 2: Mason Brick and repository initialization
+### Milestone 2: Release template and repository initialization
 
 Plan:
 
-`docs/superpowers/plans/2026-07-16-llm-wiki-m2-brick-init.md`
+`docs/superpowers/plans/2026-07-16-llm-wiki-m2-release-template-installer.md`
 
 Produces:
 
-- The versioned Mason Brick.
-- Mason detection and installation.
+- The versioned repository template.
+- The HTTPS bootstrap installer at `https://llm-wiki-dev.salesshortcut.ai/install.sh`.
+- Platform archive and checksum verification.
 - Idempotent instruction-file merging.
-- `init`, `finalize-init`, and `migrate` commands.
+- `init`, `update`, `doctor`, `uninstall`, `finalize-init`, and `migrate` commands.
 - Golden initialization tests.
 
 Gate:
 
 ```bash
-make brick
-go test ./internal/mason ./internal/initrepo ./internal/migrate
+go test ./internal/installer ./internal/initrepo ./internal/migrate
 go test ./...
 ```
 
@@ -367,7 +355,7 @@ Gate:
 
 ```bash
 go run ./cmd/llm-wiki plugin render
-./scripts/package-plugin.sh
+./scripts/package-release.sh
 ./scripts/verify-release.sh
 go test ./internal/pluginmeta ./...
 ```
@@ -383,8 +371,8 @@ Produces:
 - Representative software-project fixtures.
 - Behavioral and token-budget evaluations.
 - macOS, Linux, and Windows CI.
-- Reproducible release artifacts and checksums.
-- BrickHub publication verification.
+- Reproducible release archives and checksums.
+- Cloudflare bootstrap publication verification.
 
 Gate:
 
@@ -418,7 +406,7 @@ Expected result:
 All Go tests pass.
 Go vet reports no findings.
 The helper builds.
-The Mason Brick bundles.
+The release archives and installer verify.
 Both plugin adapters render deterministically.
 All release artifacts match their checksums.
 The worktree contains no unexpected generated diff.
@@ -432,7 +420,7 @@ Follow `2026-07-16-llm-wiki-m1-core.md`.
 
 - [ ] **Step 2: Complete Milestone 2 and its gate**
 
-Follow `2026-07-16-llm-wiki-m2-brick-init.md`.
+Follow `2026-07-16-llm-wiki-m2-release-template-installer.md`.
 
 - [ ] **Step 3: Complete Milestone 3 and its gate**
 

@@ -1,4 +1,4 @@
-.PHONY: fmt test vet build verify
+.PHONY: fmt test vet build package verify
 
 fmt:
 	test -z "$$(gofmt -l cmd internal)"
@@ -11,5 +11,8 @@ vet:
 
 build:
 	go build ./cmd/llm-wiki
+
+package:
+	./scripts/package-release.sh
 
 verify: test vet build

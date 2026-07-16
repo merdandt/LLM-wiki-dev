@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Prove the product across representative software projects, enforce token and silence budgets, run cross-platform CI, and produce reproducible plugin and Brick release artifacts.
+**Goal:** Prove the product across representative software projects, enforce token and silence budgets, run cross-platform CI, and produce reproducible plugin and installer release artifacts.
 
 **Architecture:** Separate deterministic CI tests from authenticated agent forward-evaluations. Go tests validate fixtures, hooks, generated artifacts, and budgets on every change; release candidates additionally run Codex and Claude scenario prompts against disposable fixture copies.
 
-**Tech Stack:** Go 1.26.5, Dart 3.12.2, Mason CLI 0.1.3, GitHub Actions, Markdown scenario fixtures, shell.
+**Tech Stack:** Go 1.26.5, GitHub Actions, GitHub Releases, Cloudflare, Markdown scenario fixtures, shell.
 
 ---
 
@@ -897,18 +897,10 @@ jobs:
         with:
           go-version: 1.26.5
           cache: true
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: 3.12.2
       - name: Install GNU Make on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: choco install make --no-progress -y
-      - name: Install Mason
-        run: dart pub global activate mason_cli 0.1.3
-      - name: Add Dart global bin to PATH
-        shell: bash
-        run: echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
       - name: Verify
         shell: bash
         run: make verify
@@ -922,7 +914,7 @@ jobs:
           go-version: 1.26.5
           cache: true
       - name: Package plugin
-        run: ./scripts/package-plugin.sh
+        run: ./scripts/package-release.sh
       - name: Verify release package
         run: ./scripts/verify-release.sh
       - uses: actions/upload-artifact@v4
@@ -957,7 +949,7 @@ git add .github/workflows/ci.yml
 git commit -m "ci: verify llm-wiki across platforms"
 ```
 
-## Task 6: Add reproducible release workflow and Brick checks
+## Task 6: Add reproducible release workflow and installer checks
 
 **Files:**
 
@@ -989,21 +981,12 @@ jobs:
         with:
           go-version: 1.26.5
           cache: true
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: 3.12.2
-      - name: Install Mason
-        run: |
-          dart pub global activate mason_cli 0.1.3
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
       - name: Verify source
         run: make verify
       - name: Package plugin
-        run: ./scripts/package-plugin.sh
-      - name: Bundle Brick
-        run: |
-          mkdir -p dist
-          mason bundle bricks/software-wiki -o dist
+        run: ./scripts/package-release.sh
+      - name: Build installer release archives
+        run: ./scripts/package-release.sh --dist dist
       - name: Archive plugin
         run: |
           mkdir -p dist
@@ -1031,19 +1014,16 @@ jobs:
 ```markdown
 # LLM Wiki release checklist
 
-1. Confirm `release/plugin-metadata.yaml`, Brick version, helper version, and schema compatibility.
+1. Confirm `release/plugin-metadata.yaml`, template version, helper version, and schema compatibility.
 2. Run `make verify` from a clean checkout.
 3. Run all Codex and Claude forward-evaluation scenarios.
 4. Confirm no transcripts or secrets are present in `evals/results`.
 5. Generate plugin binaries and verify checksums.
 6. Validate Claude and Codex manifests with installed official clients.
-7. Bundle the Brick with `mason bundle bricks/software-wiki -o dist`.
-8. Review Brick README, CHANGELOG, LICENSE, repository, and version.
+7. Build the five helper archives and generate sorted SHA-256 manifests.
+8. Verify `release/install.sh` through the Cloudflare subdomain and a disposable repository.
 9. Push a signed `vX.Y.Z` tag and verify GitHub release artifacts.
-10. Log in to BrickHub and run `mason publish --directory bricks/software-wiki`.
-11. Verify installation from BrickHub by version in a disposable repository.
-
-BrickHub publication is an explicit maintainer action because published versions cannot be unpublished.
+10. Publish the bootstrap installer and release manifest through Cloudflare.
 ```
 
 - [ ] **Step 3: Extend release verification**
@@ -1051,9 +1031,9 @@ BrickHub publication is an explicit maintainer action because published versions
 Extend `verify-release.sh` with an optional `--dist PATH` argument. The ordinary no-argument verification remains usable by `make verify`; when `--dist` is present, additionally assert:
 
 - Metadata version equals the Git tag when `GITHUB_REF_TYPE=tag`.
-- Brick version matches metadata.
-- The release directory contains one universal Brick bundle.
-- The plugin archive includes both manifests, hooks, four skills, the bundled source Brick, five binaries, and checksums.
+- Template version matches metadata.
+- The release directory contains one universal source template archive.
+- The release archive includes both manifests, hooks, skills, the source template, helper binaries, and checksums.
 
 Add this release-workflow step after the plugin archive and checksum are created:
 
@@ -1081,7 +1061,7 @@ git commit -m "build: add reproducible release workflow"
 
 - [ ] **Step 1: Write installation documentation**
 
-First, merge the user's existing README draft into a release-quality project README without discarding its intent. Correct the Karpathy gist and BrickHub links, then add concise sections for the compiled-wiki idea, quiet in-loop lifecycle, installation, generated repository files, safety boundaries, development commands, and links to the detailed installation and maintenance documents. Do not replace unrelated user-authored content silently.
+First, merge the user's existing README draft into a release-quality project README without discarding its intent. Correct the Karpathy gist link, then add concise sections for the compiled-wiki idea, quiet in-loop lifecycle, installation from `https://llm-wiki-dev.salesshortcut.ai/install.sh`, generated repository files, safety boundaries, development commands, and links to the detailed installation and maintenance documents. Do not replace unrelated user-authored content silently.
 
 `docs/installation.md` must contain:
 
@@ -1092,9 +1072,9 @@ First, merge the user's existing README draft into a release-quality project REA
 
 - Git
 - Codex or Claude Code
-- Dart SDK 3.5 or newer, or Homebrew on macOS/Linux
+- A Git repository
 
-The plugin bundles the native `llm-wiki` helper and source Brick. During `wiki-init`, the helper reuses or installs the pinned Mason CLI, tries the pinned BrickHub release, and falls back to the bundled Brick when the registry is unavailable.
+The installer downloads a pinned helper and source template release, verifies its checksum, and initializes the current repository. End users do not need Go, Dart, Mason, or another package manager.
 
 ## Claude Code
 
@@ -1184,10 +1164,10 @@ cd "$repo_root"
 
 make verify
 ./scripts/evaluate-artifacts.sh
-./scripts/package-plugin.sh
+./scripts/package-release.sh
 dist="$(mktemp -d)"
 trap 'rm -rf "$dist"' EXIT HUP INT TERM
-mason bundle bricks/software-wiki -o "$dist"
+./scripts/package-release.sh --output "$dist"
 git archive \
   --format=tar.gz \
   --prefix=llm-wiki/ \
@@ -1229,7 +1209,7 @@ Expected:
 
 ```text
 All unit, integration, budget, package, and release checks pass.
-The Brick bundles.
+The release archives and installer verify.
 Both plugin adapters are current.
 Five helper binaries match their checksums.
 No unexpected diff or placeholder remains.

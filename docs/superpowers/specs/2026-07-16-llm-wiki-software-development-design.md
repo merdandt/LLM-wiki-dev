@@ -14,7 +14,7 @@ It adapts Karpathy's LLM Wiki pattern to software development:
 - A structured Markdown wiki is the compiled knowledge layer.
 - Skills, hooks, rules, and deterministic tooling form the maintenance control plane.
 
-The product is distributed as one shared plugin implementation with thin adapters for Codex and Claude Code. A Mason Brick initializes the wiki in a repository. After initialization, quiet in-loop hooks ensure the active coding agent evaluates and applies any necessary wiki updates before finishing its work.
+The product is distributed as one shared plugin implementation with thin adapters for Codex and Claude Code. A signed release bundle initializes the wiki through a small bootstrap installer at `https://llm-wiki-dev.salesshortcut.ai/install.sh`. After initialization, quiet in-loop hooks ensure the active coding agent evaluates and applies any necessary wiki updates before finishing its work.
 
 The helper modifies project-memory files only. It never edits application code, creates commits, pushes branches, or opens pull requests.
 
@@ -76,7 +76,8 @@ Agents load only the knowledge needed for the current task. The system must save
 The first release must:
 
 - Work in Git repositories containing frontends, backends, services, libraries, modules, CLIs, infrastructure, or monorepos.
-- Initialize a consistent software-development wiki with Mason.
+- Initialize a consistent software-development wiki with one HTTPS installer command.
+- Publish versioned release bundles and checksums through GitHub Releases, with the branded subdomain serving only the bootstrap installer and release metadata.
 - Integrate with both Codex and Claude Code.
 - Share skills, hooks, scripts, and templates between both platforms.
 - Maintain the wiki autonomously within the active agent loop.
@@ -101,6 +102,7 @@ The first release will not include:
 - A CI bot that rewrites the wiki.
 - Transcript ingestion as an authoritative source.
 - Automatic modification of application code.
+- Mason or Dart as a required installation prerequisite.
 - Multiple federated wikis inside one Git repository.
 
 ## 5. System architecture
@@ -178,7 +180,7 @@ The control plane consists of:
 - Four reusable agent skills.
 - Shared lifecycle hooks.
 - A deterministic cross-platform helper.
-- The versioned Mason Brick.
+- The versioned repository template and release bundle.
 - Wiki schema migrations.
 
 The control plane tells agents when to recall project knowledge, when a change is material, how to synchronize the wiki, and how to validate the result.
@@ -532,8 +534,8 @@ Use when initializing LLM Wiki in a repository.
 Responsibilities:
 
 - Preflight Git and workspace state.
-- Install or verify the pinned Mason CLI.
-- Register and render the versioned Brick.
+- Download and verify the pinned release bundle.
+- Install the versioned repository template and helper assets.
 - Merge instruction blocks idempotently.
 - Analyze the repository.
 - Compile the initial wiki.
@@ -626,11 +628,11 @@ The product repository contains:
 │       ├── scripts/
 │       ├── bin/
 │       └── assets/
-└── bricks/
-    └── software-wiki/
-        ├── brick.yaml
-        ├── __brick__/
-        └── hooks/
+└── template/
+    ├── llm-wiki.yaml
+    ├── AGENTS.md
+    ├── CLAUDE.md
+    └── docs/llm-wiki/
 ```
 
 The Claude and Codex manifests are generated from shared release metadata but validated independently.
@@ -654,17 +656,16 @@ Initialization:
 1. Verifies the workspace is a Git repository.
 2. Detects the operating system and architecture.
 3. Verifies the deterministic helper.
-4. Detects a compatible Mason CLI.
-5. Installs the release-pinned Mason CLI through Dart Pub when a compatible Dart SDK is present, or installs Mason through Homebrew and verifies compatibility.
-6. Registers a pinned BrickHub version, with a bundled release fallback for offline initialization.
-7. Renders the Brick at the repository root.
-8. Merges marked integration blocks.
-9. Compiles the initial wiki.
-10. Validates the complete result.
+4. Downloads the platform-specific helper and the repository template from a pinned GitHub Release.
+5. Verifies the archive against a signed checksum manifest before extracting it.
+6. Merges the template, skills, hooks, rules, and instruction blocks into the current Git repository.
+7. Merges marked integration blocks.
+8. Compiles the initial wiki.
+9. Validates the complete result.
 
-Mason installation and Brick downloads occur only during explicit initialization or upgrade workflows.
+Network downloads occur only during explicit installation or upgrade workflows. Ordinary agent hooks never access the network.
 
-An already-installed Mason is reused when its resolved version is compatible. On Windows, automatic Mason installation requires a compatible Dart SDK. The first release does not silently install a complete Dart SDK; when neither a compatible Mason, Dart, nor supported Homebrew installation exists, initialization reports the missing prerequisite. The bundled Brick fallback supports offline initialization only when a compatible Mason CLI is already available.
+The installer supports macOS, Linux, and Windows helper archives. It refuses an unverified or unsupported archive and reports a concise recovery command. A later release may export the same template for other package managers, but no package manager is part of the critical path.
 
 ### 13.3 Instruction-file merging
 
@@ -814,7 +815,7 @@ The default system:
 - Does not send source code to an additional service.
 - Avoids `.env`, credential stores, generated secrets, and ignored secret files as evidence.
 - Runs secret-pattern validation before accepting a wiki receipt.
-- Pins plugin, helper, Brick, and schema versions.
+- Pins plugin, helper, template, and schema versions.
 - Verifies packaged helper checksums and release metadata.
 
 Hooks are still executable code and remain subject to each host's trust and workspace policies.
@@ -843,13 +844,13 @@ Local full-text search may be added after index sharding. Embeddings or MCP sear
 Four versions are independent:
 
 - Plugin version: installable product release.
-- Brick version: initialization template.
+- Template version: initialization files and managed integrations.
 - Wiki schema version: on-disk knowledge contract.
 - Helper version: deterministic runtime.
 
 `llm-wiki.yaml` records all required compatibility information.
 
-The Brick is used to initialize new repositories. Existing wikis are upgraded through ordered, idempotent schema migrations.
+The versioned template is used to initialize new repositories. Existing wikis are upgraded through ordered, idempotent schema migrations.
 
 A safe migration:
 
@@ -890,7 +891,7 @@ Test:
 
 Golden tests cover:
 
-- Default Brick output.
+- Default template output.
 - Configurable wiki path.
 - Existing `AGENTS.md`.
 - Existing `CLAUDE.md`.
@@ -934,7 +935,7 @@ CI validates:
 - Claude manifest and marketplace.
 - Codex manifest and marketplace.
 - Shared hook configuration.
-- Mason Brick validation.
+- Installer archive and checksum validation.
 - Supported helper architectures.
 
 ### 21.5 Behavioral evaluations
@@ -956,7 +957,7 @@ Evaluations measure:
 The MVP is complete when:
 
 1. A user can install the plugin in either Codex or Claude Code.
-2. `wiki-init` initializes a Git repository using a pinned Mason Brick.
+2. `install.sh` initializes a Git repository using a pinned, verified release bundle.
 3. Running initialization twice produces no second diff.
 4. Existing instruction files are preserved.
 5. An agent can recall a bounded project context before a task.
@@ -976,20 +977,17 @@ The MVP is complete when:
 Implementation proceeds in five milestones:
 
 1. Core schema, configuration, helper state model, and validator.
-2. Mason Brick and idempotent repository initialization.
+2. Signed release bundle and idempotent repository initialization.
 3. Agent skills, instruction integration, and lifecycle behavior.
 4. Claude and Codex plugin adapters and marketplaces.
-5. Cross-platform fixtures, evaluations, release packaging, and BrickHub publication.
+5. Cross-platform fixtures, evaluations, release packaging, and installer publication.
 
 Each milestone must pass its own tests before the next milestone depends on it.
 
 ## 24. Source references
 
 - [Karpathy: LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
-- [BrickHub overview](https://docs.brickhub.dev/)
-- [Brick structure](https://docs.brickhub.dev/brick-structure/)
-- [Mason Brick syntax](https://docs.brickhub.dev/brick-syntax/)
-- [Mason hooks](https://docs.brickhub.dev/hooks/)
+- [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
 - [Claude Code plugins](https://code.claude.com/docs/en/plugins)
 - [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference)
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)

@@ -41,9 +41,9 @@ keywords:
   - codex
   - claude-code
 category: Productivity
-brick:
-  name: llm_wiki
-  version: 0.1.0+1
+template:
+  name: software-wiki
+  version: 0.1.0
 helper:
   schema_version: 1
   targets:
@@ -106,7 +106,7 @@ type Author struct {
 	Email string `yaml:"email"`
 }
 
-type Brick struct {
+	type Template struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
 }
@@ -128,7 +128,7 @@ type Metadata struct {
 	License         string   `yaml:"license"`
 	Keywords        []string `yaml:"keywords"`
 	Category        string   `yaml:"category"`
-	Brick           Brick    `yaml:"brick"`
+	Template        Template `yaml:"template"`
 	Helper          Helper   `yaml:"helper"`
 }
 
@@ -150,9 +150,9 @@ func Load(path string) (Metadata, error) {
 		return Metadata{}, errors.New("plugin name must be kebab-case")
 	}
 	if !semanticVersion.MatchString(metadata.Version) ||
-		!semanticVersion.MatchString(metadata.Brick.Version) ||
+		!semanticVersion.MatchString(metadata.Template.Version) ||
 		metadata.Description == "" || metadata.Author.Name == "" {
-		return Metadata{}, errors.New("valid plugin/Brick versions, description, and author name are required")
+		return Metadata{}, errors.New("valid plugin/template versions, description, and author name are required")
 	}
 	if len(metadata.Helper.Targets) == 0 {
 		return Metadata{}, errors.New("at least one helper target is required")
@@ -454,8 +454,8 @@ git commit -m "feat: add Claude and Codex marketplaces"
 **Files:**
 
 - Create: `.gitattributes`
-- Create: `scripts/package-plugin.sh`
-- Create: `plugins/llm-wiki/assets/bricks/software-wiki/`
+- Create: `scripts/package-release.sh`
+- Create: `plugins/llm-wiki/assets/template/`
 - Create: `plugins/llm-wiki/assets/release-checksums.json`
 - Create: `internal/pluginmeta/checksums.go`
 - Create: `internal/pluginmeta/checksums_test.go`
@@ -477,7 +477,7 @@ plugins/llm-wiki/bin/** binary
 
 - [ ] **Step 2: Create the packaging script**
 
-`scripts/package-plugin.sh`:
+`scripts/package-release.sh`:
 
 ```sh
 #!/bin/sh
@@ -490,12 +490,12 @@ go run ./cmd/llm-wiki plugin render >/dev/null
 version="$(awk '/^version:/ { print $2; exit }' release/plugin-metadata.yaml)"
 ldflags="-s -w -X github.com/merdandt/LLM-wiki-dev/internal/cli.Version=$version"
 
-rm -rf plugins/llm-wiki/assets/bricks/software-wiki
-mkdir -p plugins/llm-wiki/assets/bricks/software-wiki
-git ls-files bricks/software-wiki |
+rm -rf plugins/llm-wiki/assets/template
+mkdir -p plugins/llm-wiki/assets/template
+git ls-files template |
   while IFS= read -r source; do
-    relative="${source#bricks/software-wiki/}"
-    destination="plugins/llm-wiki/assets/bricks/software-wiki/$relative"
+    relative="${source#template/}"
+    destination="plugins/llm-wiki/assets/template/$relative"
     mkdir -p "$(dirname "$destination")"
     cp "$source" "$destination"
   done
@@ -612,17 +612,17 @@ Add:
 .PHONY: package
 
 package:
-	./scripts/package-plugin.sh
+	./scripts/package-release.sh
 ```
 
 - [ ] **Step 5: Build all targets**
 
 ```bash
-chmod +x scripts/package-plugin.sh
-./scripts/package-plugin.sh
+chmod +x scripts/package-release.sh
+./scripts/package-release.sh
 ```
 
-Expected: the source Brick is copied into plugin assets, and five binaries plus one checksum manifest are generated.
+Expected: the source template is copied into plugin assets, and five binaries plus one checksum manifest are generated.
 
 - [ ] **Step 6: Verify embedded versions**
 
@@ -643,7 +643,7 @@ Use the matching local target when not on macOS ARM64.
 - [ ] **Step 7: Commit packaging source and release artifacts**
 
 ```bash
-git add .gitattributes .gitignore Makefile scripts/package-plugin.sh internal/pluginmeta internal/cli plugins/llm-wiki/assets
+git add .gitattributes .gitignore Makefile scripts/package-release.sh internal/pluginmeta internal/cli plugins/llm-wiki/assets
 git add -f plugins/llm-wiki/bin/*/llm-wiki plugins/llm-wiki/bin/*/llm-wiki.exe
 git commit -m "build: package cross-platform plugin binaries"
 ```
@@ -664,7 +664,7 @@ The Go test must assert:
 - Both marketplace entries point to `./plugins/llm-wiki`.
 - Exactly four skill directories exist.
 - `hooks/hooks.json` exists.
-- `assets/bricks/software-wiki/brick.yaml` exists and its version equals shared Brick metadata.
+- `assets/template/llm-wiki.yaml` exists and its version equals shared template metadata.
 - Every metadata target has one binary.
 - Every binary matches `release-checksums.json`.
 - Mach-O, ELF, and PE magic bytes match each declared target, and Unix binaries have an executable bit.
@@ -695,7 +695,7 @@ git diff --exit-code -- \
   .agents/plugins/marketplace.json \
   plugins/llm-wiki/.claude-plugin/plugin.json \
   plugins/llm-wiki/.codex-plugin/plugin.json \
-  plugins/llm-wiki/assets/bricks \
+  plugins/llm-wiki/assets/template \
   plugins/llm-wiki/assets/release-checksums.json \
   plugins/llm-wiki/bin
 
@@ -730,7 +730,7 @@ The temporary `CODEX_HOME` prevents validation from changing the maintainer's re
 release-verify:
 	./scripts/verify-release.sh
 
-verify: fmt test vet build brick hook-test release-verify
+verify: fmt test vet build package hook-test release-verify
 ```
 
 - [ ] **Step 6: Run and commit**
