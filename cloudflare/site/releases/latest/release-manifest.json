@@ -1,16 +1,16 @@
 {
-  "version": "0.1.1",
-  "release_base_url": "https://github.com/merdandt/LLM-wiki-dev/releases/download/v0.1.1",
+  "version": "0.1.2",
+  "release_base_url": "https://github.com/merdandt/LLM-wiki-dev/releases/download/v0.1.2",
   "artifacts": {
     "darwin-arm64.archive": "llm-wiki-darwin-arm64.tar.gz",
-    "darwin-arm64.sha256": "28b19e1f6ed21e7e0387aca0a7841dd989fd21428bf36b3ecccec7e316ff2163",
+    "darwin-arm64.sha256": "656eff0b4a6a21df715a7afe398ed2b8c7ed5b172f81f5c62f8fcbb3b817bdbd",
     "darwin-amd64.archive": "llm-wiki-darwin-amd64.tar.gz",
-    "darwin-amd64.sha256": "c6aa0e466a8d96c5c76dedc846688b58be0eeb43e3414ea67b99029cf1c4239d",
+    "darwin-amd64.sha256": "b2937a168f7db3ddd386dcc32f51b99b5286ce61351feeb761044bbe2909bce3",
     "linux-arm64.archive": "llm-wiki-linux-arm64.tar.gz",
-    "linux-arm64.sha256": "29510de1edc01b853932b0b7014425031565ac6bab3fb0cd36e46e5f5953d8f5",
+    "linux-arm64.sha256": "63b812fb090fbe0cc20625c7ba8963f234d86f570de916cdb1ea5ae772cf2b17",
     "linux-amd64.archive": "llm-wiki-linux-amd64.tar.gz",
-    "linux-amd64.sha256": "db957b266d3dd4cde806e4fda4d6315b9a5d35958c86478fcbad56dc36e77eb3",
+    "linux-amd64.sha256": "98210895c0ced57c6767b5c62221e056448bbac4393444c647fb293a79d5d152",
     "windows-amd64.archive": "llm-wiki-windows-amd64.tar.gz",
-    "windows-amd64.sha256": "7abaf05e7037c614480da8b58722114a1b5f2ca326b901c75903c6ebe1bbef18"
+    "windows-amd64.sha256": "1ddd78ed6e864bfcece558ceacfd262c62849d70c1725c8ea33f692530818e8e"
   }
 }
