@@ -39,7 +39,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return runInit(args[1:], stdout, stderr)
 		}
 	}
-	fmt.Fprintln(stderr, "usage: llm-wiki <version|validate|status|init|finalize-init|migrate|hook|receipt|plugin>")
+	fmt.Fprintln(stderr, "usage: llm-wiki <version|init|status|validate|fingerprint>")
 	return 2
 }
 
