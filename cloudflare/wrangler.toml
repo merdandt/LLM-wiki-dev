@@ -2,6 +2,11 @@ name = "llm-wiki-dev-installer"
 main = "worker.mjs"
 compatibility_date = "2026-07-16"
 
+routes = [
+  { pattern = "llm-wiki-dev.salesshortcut.ai", custom_domain = true }
+]
+
 [assets]
 directory = "./site"
 binding = "ASSETS"
+run_worker_first = true

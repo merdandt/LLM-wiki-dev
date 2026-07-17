@@ -89,6 +89,7 @@ helper_name=llm-wiki
 case "$helper" in *.exe) helper_name=llm-wiki.exe ;; esac
 install -m 0755 "$helper" "$destination/$helper_name"
 if [ -d "$extract/llm-wiki/template" ]; then
+  rm -rf "$destination/template"
   cp -R "$extract/llm-wiki/template" "$destination/template"
 fi
 
