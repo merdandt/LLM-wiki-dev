@@ -1,5 +1,4 @@
-const VERSION = "0.1.0";
-const RELEASE_BASE = `https://github.com/merdandt/LLM-wiki-dev/releases/download/v${VERSION}`;
+const RELEASE_ORIGIN = "https://github.com/merdandt/LLM-wiki-dev/releases/download";
 const ARCHIVES = new Set([
   "llm-wiki-darwin-arm64.tar.gz",
   "llm-wiki-darwin-amd64.tar.gz",
@@ -8,11 +7,8 @@ const ARCHIVES = new Set([
   "llm-wiki-windows-amd64.tar.gz",
 ]);
 
-const ASSET_PATHS = new Set([
-  "/install.sh",
-  "/releases/latest/release-manifest.json",
-  `/releases/${VERSION}/release-manifest.json`,
-]);
+const MANIFEST_PATH = /^\/releases\/(?:latest|\d+\.\d+\.\d+)\/release-manifest\.json$/;
+const ARCHIVE_PATH = /^\/releases\/(\d+\.\d+\.\d+)\/([^/]+)$/;
 
 function assetResponse(response, path) {
   if (!response.ok) return new Response("Not Found\n", { status: 404 });
@@ -32,14 +28,13 @@ export default {
       return new Response("Method Not Allowed\n", { status: 405, headers: { allow: "GET, HEAD" } });
     }
 
-    if (ASSET_PATHS.has(url.pathname)) {
+    if (url.pathname === "/install.sh" || MANIFEST_PATH.test(url.pathname)) {
       return assetResponse(await env.ASSETS.fetch(request), url.pathname);
     }
 
-    const prefix = `/releases/${VERSION}/`;
-    if (url.pathname.startsWith(prefix)) {
-      const archive = url.pathname.slice(prefix.length);
-      if (ARCHIVES.has(archive)) return Response.redirect(`${RELEASE_BASE}/${archive}`, 302);
+    const archive = url.pathname.match(ARCHIVE_PATH);
+    if (archive && ARCHIVES.has(archive[2])) {
+      return Response.redirect(`${RELEASE_ORIGIN}/v${archive[1]}/${archive[2]}`, 302);
     }
 
     return new Response("Not Found\n", { status: 404 });

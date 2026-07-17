@@ -81,17 +81,30 @@ func Initialize(root, templateDir string) error {
 func mergeGitignore(root, addition string) error {
 	path := filepath.Join(root, ".gitignore")
 	existing, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return atomicfile.Write(path, []byte(strings.TrimRight(addition, "\n")+"\n"), 0o644)
-	}
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if strings.Contains(string(existing), strings.TrimSpace(addition)) {
+	present := make(map[string]bool)
+	for _, line := range strings.Split(string(existing), "\n") {
+		present[strings.TrimSpace(line)] = true
+	}
+	var missing []string
+	for _, line := range strings.Split(addition, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !present[line] {
+			missing = append(missing, line)
+			present[line] = true
+		}
+	}
+	if len(missing) == 0 {
 		return nil
 	}
-	joined := strings.TrimRight(string(existing), "\n") + "\n" + strings.TrimRight(addition, "\n") + "\n"
-	return atomicfile.Write(path, []byte(joined), 0o644)
+	text := strings.TrimRight(string(existing), "\n")
+	if text != "" {
+		text += "\n"
+	}
+	text += strings.Join(missing, "\n") + "\n"
+	return atomicfile.Write(path, []byte(text), 0o644)
 }
 
 func mergeInstructions(path, managed string) error {

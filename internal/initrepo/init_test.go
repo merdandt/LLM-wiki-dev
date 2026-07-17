@@ -41,6 +41,58 @@ func TestInitializeIsIdempotentAndPreservesInstructions(t *testing.T) {
 	}
 }
 
+func TestInitializeIgnoresHelperDirectory(t *testing.T) {
+	root := t.TempDir()
+	runGit(t, root, "init", "-q")
+	template := filepath.Join("..", "..", "template")
+	if err := Initialize(root, template); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{".llm-wiki/", ".llm-wiki-state/"} {
+		if !containsLine(string(data), line) {
+			t.Fatalf(".gitignore is missing %q:\n%s", line, data)
+		}
+	}
+}
+
+func TestMergeGitignoreAddsOnlyMissingLines(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(path, []byte("node_modules/\n.llm-wiki-state/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := mergeGitignore(root, ".llm-wiki-state/\n.llm-wiki/\n"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if got := strings.Count(text, ".llm-wiki-state/"); got != 1 {
+		t.Fatalf("expected exactly one .llm-wiki-state/ line, got %d:\n%s", got, text)
+	}
+	if !containsLine(text, ".llm-wiki/") {
+		t.Fatalf(".gitignore is missing .llm-wiki/:\n%s", text)
+	}
+	if !containsLine(text, "node_modules/") {
+		t.Fatalf("existing entries were lost:\n%s", text)
+	}
+}
+
+func containsLine(text, want string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		if strings.TrimSpace(line) == want {
+			return true
+		}
+	}
+	return false
+}
+
 func runGit(t *testing.T, root string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)

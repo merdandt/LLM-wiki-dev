@@ -10,4 +10,4 @@ The bootstrap script downloads a versioned helper release, verifies its SHA-256 
 
 The normal install requires Git, a POSIX shell, `curl`, `tar`, and a SHA-256 utility. It does not require Go, Dart, Mason, Homebrew, Node, or Python.
 
-The generated `docs/llm-wiki/`, `llm-wiki.yaml`, `AGENTS.md`, and `CLAUDE.md` files are team-owned and should be committed. Hooks and skills must invoke the local `.llm-wiki/llm-wiki` helper; they must not perform network requests during ordinary agent sessions.
+The generated `docs/llm-wiki/`, `llm-wiki.yaml`, `AGENTS.md`, and `CLAUDE.md` files are team-owned and should be committed. The `.llm-wiki/` helper directory holds a platform-specific binary and is added to `.gitignore` automatically; each machine reruns the install command above (it is idempotent) instead of committing the binary. Hooks and skills must invoke the local `.llm-wiki/llm-wiki` helper; they must not perform network requests during ordinary agent sessions.

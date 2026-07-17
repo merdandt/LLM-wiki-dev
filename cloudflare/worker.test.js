@@ -2,8 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "./worker.mjs";
 
-const version = "0.1.0";
-const releaseBase = `https://github.com/merdandt/LLM-wiki-dev/releases/download/v${version}`;
+const releaseOrigin = "https://github.com/merdandt/LLM-wiki-dev/releases/download";
 
 function assets() {
   return {
@@ -28,29 +27,43 @@ test("serves the installer and latest manifest from static assets", async () => 
   assert.equal(manifest.headers.get("content-type"), "application/json; charset=utf-8");
 });
 
-test("serves a version-pinned manifest and redirects immutable archives", async () => {
-  const manifest = await worker.fetch(
-    new Request(`https://example.test/releases/${version}/release-manifest.json`),
-    { ASSETS: assets() },
-  );
-  assert.equal(manifest.status, 200);
-
+test("serves manifests and redirects immutable archives for any release version", async () => {
   const archive = "llm-wiki-linux-amd64.tar.gz";
-  const response = await worker.fetch(
-    new Request(`https://example.test/releases/${version}/${archive}`),
-    assets(),
-  );
-  assert.equal(response.status, 302);
-  assert.equal(response.headers.get("location"), `${releaseBase}/${archive}`);
+  for (const version of ["0.1.0", "0.1.1", "2.3.4"]) {
+    const manifest = await worker.fetch(
+      new Request(`https://example.test/releases/${version}/release-manifest.json`),
+      { ASSETS: assets() },
+    );
+    assert.equal(manifest.status, 200, `manifest for ${version}`);
+    assert.equal(manifest.headers.get("content-type"), "application/json; charset=utf-8");
+
+    const response = await worker.fetch(
+      new Request(`https://example.test/releases/${version}/${archive}`),
+      { ASSETS: assets() },
+    );
+    assert.equal(response.status, 302, `redirect for ${version}`);
+    assert.equal(response.headers.get("location"), `${releaseOrigin}/v${version}/${archive}`);
+  }
 });
 
-test("returns 404 for unknown paths and archive names", async () => {
-  const unknown = await worker.fetch(new Request("https://example.test/nope"), { ASSETS: assets() });
-  assert.equal(unknown.status, 404);
+test("returns 404 for unknown paths, versions, and archive names", async () => {
+  for (const path of [
+    "/nope",
+    "/releases/0.1.0/unknown.tar.gz",
+    "/releases/abc/llm-wiki-linux-amd64.tar.gz",
+    "/releases/0.1/release-manifest.json",
+    "/releases/0.1.0/../llm-wiki-linux-amd64.tar.gz",
+  ]) {
+    const response = await worker.fetch(new Request(`https://example.test${path}`), { ASSETS: assets() });
+    assert.equal(response.status, 404, `expected 404 for ${path}`);
+  }
+});
 
-  const unknownArchive = await worker.fetch(
-    new Request(`https://example.test/releases/${version}/unknown.tar.gz`),
+test("rejects non-read methods", async () => {
+  const response = await worker.fetch(
+    new Request("https://example.test/install.sh", { method: "POST" }),
     { ASSETS: assets() },
   );
-  assert.equal(unknownArchive.status, 404);
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get("allow"), "GET, HEAD");
 });
