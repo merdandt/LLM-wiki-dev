@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/merdandt/LLM-wiki-dev/internal/config"
+	"github.com/merdandt/LLM-wiki-dev/internal/lock"
 	"github.com/merdandt/LLM-wiki-dev/internal/state"
 )
 
@@ -139,6 +140,49 @@ func TestStopDriftKeepsLeaseAndIncrementsRecovery(t *testing.T) {
 	owner, err := lockOwner(root, worktreeID)
 	if err != nil || owner != "s1" {
 		t.Fatalf("lease owner = %q err=%v, want s1 held", owner, err)
+	}
+}
+
+func TestStopLeaseConflictWarnsWithoutStealing(t *testing.T) {
+	root := initializedRepoFixture(t)
+	startSession(t, root)
+	materialChange(t, root)
+
+	repo := discoverRepo(t, root)
+	worktreeID, err := repo.WorktreeID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := state.NewLayout(filepath.Join(root, ".llm-wiki-state"))
+	lockPath := layout.LockPath(worktreeID)
+	lease, err := lock.Acquire(context.Background(), lockPath, "other-session", time.Second, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Intentionally not released: this simulates a concurrent session
+	// holding the synchronization lease across Stop's call.
+
+	result, err := Stop(context.Background(), Input{SessionID: "s1", CWD: root, EventName: "Stop"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeFailure {
+		t.Fatalf("Outcome = %q, want %q", result.Outcome, OutcomeFailure)
+	}
+	if result.Reason == "" {
+		t.Fatal("Reason is empty, want a warning explaining the lease conflict")
+	}
+
+	owner, err := lock.CurrentOwner(context.Background(), lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner != "other-session" {
+		t.Fatalf("lease owner = %q, want it unchanged (no steal)", owner)
+	}
+
+	if err := lease.Release(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 

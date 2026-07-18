@@ -110,6 +110,39 @@ func TestWriteHookConfigsSkipsMalformed(t *testing.T) {
 	}
 }
 
+func TestWriteHookConfigsEmptyFile(t *testing.T) {
+	root := t.TempDir()
+	claudeDir := filepath.Join(root, ".claude")
+	codexDir := filepath.Join(root, ".codex")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	claudePath := filepath.Join(claudeDir, "settings.json")
+	codexPath := filepath.Join(codexDir, "hooks.json")
+	if err := os.WriteFile(claudePath, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(codexPath, []byte("  \n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	warnings, err := WriteHookConfigs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	for _, path := range []string{claudePath, codexPath} {
+		doc := readHooks(t, path)
+		if len(hookEntries(t, doc, "SessionStart")) != 1 || len(hookEntries(t, doc, "Stop")) != 1 {
+			t.Fatalf("%s: missing hook entries: %v", path, doc)
+		}
+	}
+}
+
 func TestWriteHookConfigsSkipsUnexpectedHooksShape(t *testing.T) {
 	root := t.TempDir()
 	claudeDir := filepath.Join(root, ".claude")

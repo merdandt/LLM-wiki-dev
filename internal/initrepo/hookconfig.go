@@ -1,6 +1,7 @@
 package initrepo
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,6 +72,9 @@ func mergeHookFile(path string, events map[string][]any) (string, error) {
 	case errors.Is(err, os.ErrNotExist):
 	case err != nil:
 		return "", err
+	case len(bytes.TrimSpace(data)) == 0:
+		// Empty or whitespace-only content is treated as an absent file,
+		// not malformed JSON: fall through to write our full config.
 	default:
 		if err := json.Unmarshal(data, &doc); err != nil {
 			return fmt.Sprintf("llm-wiki: %s is not valid JSON; add the LLM Wiki hooks manually", path), nil

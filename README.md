@@ -119,6 +119,23 @@ Then use the helper:
 
 **So what should you expect?** After install, both hooks are wired automatically: a session-start hook injects a small orientation packet (where the wiki is, how to search it), and a stop hook runs the sticky-note check after every agent turn — silent unless durable knowledge drifted, in which case the agent gets exactly one quiet maintenance pass to update the wiki (and README sections the change invalidated) before finishing. Codex users approve the project hooks once with `/hooks`.
 
+## How the hooks work
+
+`llm-wiki init` wires two quiet hooks into `.claude/settings.json` (Claude Code) and `.codex/hooks.json` (Codex) — both committed, so the team gets them via `git pull`.
+
+**Session start** injects a ≤1KB orientation packet: where the wiki lives, to read `index.md` first, the `status`/`validate` shortcuts, and current health. It also notices commits made outside any session (a teammate's `git pull`) and flags material ones for one audit pass.
+
+**Stop** runs after every agent turn and lands in one of four states:
+
+| State | When | What you see |
+| --- | --- | --- |
+| clean | Nothing durable changed since the last sticky note | nothing |
+| synchronized | Changes exist and the wiki was already reconciled | nothing |
+| drift | Durable changes with no matching note | the agent gets one quiet maintenance pass: update wiki pages, refresh README sections the change invalidated, `validate`, then `receipt write` |
+| failure | The single pass was already spent, or another session is syncing | one short warning; your session never blocks |
+
+The check is deterministic file comparison — no second model, no network. The *judgment* about what knowledge changed is made by the agent already in your repo, under a per-worktree lease so two sessions can't fight over the wiki. Guards cap it at one maintenance pass per turn, and every hook is a silent no-op in repos without the helper binary.
+
 ## How releases are delivered
 
 GitHub Releases hold immutable versioned archives with checksums. A Cloudflare Worker at `llm-wiki-dev.salesshortcut.ai` serves the installer and version manifests, and redirects archive downloads to the matching GitHub release — so any released version stays installable forever via `--version`. Release procedure: `docs/maintenance.md`.
