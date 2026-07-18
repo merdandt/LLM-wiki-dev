@@ -115,11 +115,9 @@ Then use the helper:
 
 **Not shipped yet:**
 
-- The automatic hook wiring (SessionStart / Stop) and the recall/sync/audit skills, packaged as a once-per-user plugin for Claude Code and Codex
+- The recall/sync/audit skills and plugin packaging for Claude Code and Codex
 
-**So what should you expect right now?** After install, agents that read `AGENTS.md`/`CLAUDE.md` (both Claude Code and Codex do) are instructed to treat `docs/llm-wiki/` as project memory: read relevant pages before working, update them after durable changes, and run `llm-wiki validate`. That works today, but it relies on the agent following instructions — nothing *fires automatically* yet. The sticky-note lifecycle above describes the designed behavior that the upcoming hook + plugin release automates. There is intentionally no `.claude/` folder in your project: hooks and skills will ship in the plugin, installed once per user, so projects only carry team-owned files.
-
-Until then, an impatient project can wire an interim check manually — a Claude Code `Stop` hook in `.claude/settings.json` that runs `./.llm-wiki/llm-wiki validate` so a broken wiki surfaces at the end of a session.
+**So what should you expect?** After install, both hooks are wired automatically: a session-start hook injects a small orientation packet (where the wiki is, how to search it), and a stop hook runs the sticky-note check after every agent turn — silent unless durable knowledge drifted, in which case the agent gets exactly one quiet maintenance pass to update the wiki (and README sections the change invalidated) before finishing. Codex users approve the project hooks once with `/hooks`.
 
 ## How releases are delivered
 
