@@ -30,7 +30,7 @@ Reads hook JSON from stdin (`session_id`, `cwd`, `hook_event_name`, optional `so
 
 1. If `cwd` is not in a Git repo, `llm-wiki.yaml` is absent, or `initialized: false` → exit 0, no output.
 2. Record/refresh the session baseline in `.llm-wiki-state/` (existing `state.Session`, keyed by `session_id`; reuse binds only to the same worktree).
-3. Unseen-commit detection: compare HEAD against the stored `state.Observation`. Non-material unseen changes (per `materiality.ClassifyPaths`) → write an automatic `no-update` receipt and advance the observation silently. Material unseen changes or validation problems → set `StartupAudit` on the session.
+3. Unseen-commit detection: compare HEAD against the stored `state.Observation`. Non-material unseen changes (per `materiality.ClassifyPaths`) → advance the observation silently; no receipt is needed because the session baseline is a full fingerprint that already captures them, so Stop cannot misread them as drift. Material unseen changes or validation problems → set `StartupAudit` on the session.
 4. Print an orientation packet to stdout, hard-capped at 1024 bytes:
 
 ```
