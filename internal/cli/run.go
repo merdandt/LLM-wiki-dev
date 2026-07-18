@@ -23,6 +23,10 @@ import (
 var Version = "dev"
 
 func Run(args []string, stdout, stderr io.Writer) int {
+	return RunWithStdin(os.Stdin, args, stdout, stderr)
+}
+
+func RunWithStdin(stdin io.Reader, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && args[0] == "version" {
 		fmt.Fprintf(stdout, "llm-wiki %s\n", Version)
 		return 0
@@ -37,9 +41,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return runStatus(args[1:], stdout, stderr)
 		case "init":
 			return runInit(args[1:], stdout, stderr)
+		case "hook":
+			return runHook(stdin, args[1:], stdout, stderr)
+		case "receipt":
+			return runReceipt(args[1:], stdout, stderr)
 		}
 	}
-	fmt.Fprintln(stderr, "usage: llm-wiki <version|init|status|validate|fingerprint>")
+	fmt.Fprintln(stderr, "usage: llm-wiki <version|init|status|validate|fingerprint|hook|receipt>")
 	return 2
 }
 
