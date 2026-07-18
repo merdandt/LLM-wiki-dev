@@ -103,6 +103,8 @@ Then use the helper:
 | `llm-wiki init` | (Re)install the template — never overwrites your files |
 | `llm-wiki version` | Installed version |
 
+Init also adds `wiki-status`, `wiki-validate`, and `wiki-finalize` targets to your project's `Makefile` (created if absent, merged inside markers if present), so `make wiki-status` works out of the box.
+
 ## What works today, what to expect
 
 **Working now:**

@@ -63,3 +63,34 @@ func TestRunInitWiresHookConfigs(t *testing.T) {
 		}
 	}
 }
+
+func TestRunInitWritesMakefileTargets(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("# fixture\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init", "-q"}, {"add", "."},
+		{"-c", "user.name=T", "-c", "user.email=t@e.c", "commit", "-qm", "baseline"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	template, err := filepath.Abs(filepath.Join("..", "..", "template"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := Run([]string{"init", "--root", root, "--template", template}, &stdout, &stderr); code != 0 {
+		t.Fatalf("init: code=%d stderr=%s", code, stderr.String())
+	}
+	data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "wiki-status:") {
+		t.Fatalf("Makefile missing wiki targets:\n%s", data)
+	}
+}

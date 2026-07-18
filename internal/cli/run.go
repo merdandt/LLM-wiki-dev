@@ -75,6 +75,9 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	for _, warning := range warnings {
 		fmt.Fprintln(stderr, warning)
 	}
+	if err := initrepo.WriteMakefileTargets(repo.Root); err != nil {
+		return commandError(stderr, err)
+	}
 	fmt.Fprintln(stdout, "llm-wiki: initialized repository template")
 	return 0
 }
