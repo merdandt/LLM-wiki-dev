@@ -62,6 +62,17 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	if err := initrepo.Initialize(*rootFlag, *templateFlag); err != nil {
 		return commandError(stderr, err)
 	}
+	repo, err := gitrepo.Discover(*rootFlag)
+	if err != nil {
+		return commandError(stderr, err)
+	}
+	warnings, err := initrepo.WriteHookConfigs(repo.Root)
+	if err != nil {
+		return commandError(stderr, err)
+	}
+	for _, warning := range warnings {
+		fmt.Fprintln(stderr, warning)
+	}
 	fmt.Fprintln(stdout, "llm-wiki: initialized repository template")
 	return 0
 }
