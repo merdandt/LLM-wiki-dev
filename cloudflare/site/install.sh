@@ -96,4 +96,69 @@ fi
 if [ "$global" -eq 0 ] && [ "$no_init" -eq 0 ]; then
   LLM_WIKI_TEMPLATE_DIR="$destination/template" "$destination/$helper_name" init --root "$root"
 fi
-echo "llm-wiki: installed $destination/$helper_name"
+
+banner=$("$destination/$helper_name" version 2>/dev/null || echo "llm-wiki")
+docs_url="https://github.com/merdandt/LLM-wiki-dev#readme"
+
+if [ "$global" -eq 1 ]; then
+  cat <<EOF
+
+$banner installed at $destination/$helper_name.
+
+  Run "llm-wiki init" inside a Git repository to set one up.
+
+  Docs: $docs_url
+EOF
+elif [ "$no_init" -eq 1 ]; then
+  cat <<EOF
+
+$banner installed at $destination/$helper_name.
+
+  Helper installed without touching repository files.
+  Run ".llm-wiki/llm-wiki init" when ready.
+
+  Docs: $docs_url
+EOF
+else
+  initialized=$(sed -n 's/^initialized:[[:space:]]*//p' "$root/llm-wiki.yaml" 2>/dev/null | sed -n '1p')
+  if [ "$initialized" = "true" ]; then
+    cat <<EOF
+
+$banner installed. Wiki already compiled - lifecycle hooks are active.
+
+  Codex only: run /hooks once in your next session to approve the project hooks.
+
+  Useful commands:
+    .llm-wiki/llm-wiki status      wiki health and sync state
+    .llm-wiki/llm-wiki validate    structural check
+
+  Docs: $docs_url
+EOF
+  else
+    cat <<EOF
+
+$banner installed.
+
+  Created for you:
+    docs/llm-wiki/          team wiki (scaffold - an agent compiles it)
+    llm-wiki.yaml           configuration
+    AGENTS.md / CLAUDE.md   agent instructions (your content preserved)
+    .claude/settings.json   Claude Code lifecycle hooks
+    .codex/hooks.json       Codex lifecycle hooks
+
+  Next steps:
+    1. Review and commit the files above - the wiki is team memory, shared via git.
+    2. Codex only: run /hooks once in your next session to approve the project hooks.
+    3. Open a coding-agent session (Claude Code or Codex). The session-start hook
+       asks the agent to compile the wiki from your codebase and finish with:
+         .llm-wiki/llm-wiki finalize-init
+       After that, maintenance runs quietly at the end of every session.
+
+  Useful commands:
+    .llm-wiki/llm-wiki status      wiki health and sync state
+    .llm-wiki/llm-wiki validate    structural check
+
+  Docs: $docs_url
+EOF
+  fi
+fi
