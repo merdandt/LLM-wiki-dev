@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -95,8 +97,8 @@ func TestHookLifecycleEndToEnd(t *testing.T) {
 	}
 	var stdoutBuf, stderrBuf bytes.Buffer
 	code = Run([]string{"receipt", "write", "--kind", "synced", "--root", root}, &stdoutBuf, &stderrBuf)
-	if code != 0 {
-		t.Fatalf("receipt write: code=%d stderr=%q", code, stderrBuf.String())
+	if code != 0 || stdoutBuf.Len() != 0 || stderrBuf.Len() != 0 {
+		t.Fatalf("receipt write: code=%d stdout=%q stderr=%q", code, stdoutBuf.String(), stderrBuf.String())
 	}
 
 	// 5. Next stop is silent again.
@@ -124,11 +126,157 @@ func TestReceiptWriteWithoutLease(t *testing.T) {
 	}
 }
 
+func TestReceiptWriteCorruptSessionSurfacesError(t *testing.T) {
+	root := hookFixture(t)
+
+	if _, _, code := runHookCommand(t, root, "session-start", "s1", nil); code != 0 {
+		t.Fatalf("session-start code=%d", code)
+	}
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main // v2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, code := runHookCommand(t, root, "stop", "s1", nil)
+	if code != 0 {
+		t.Fatalf("drift stop code=%d", code)
+	}
+	var block map[string]string
+	if err := json.Unmarshal([]byte(stdout), &block); err != nil || block["decision"] != "block" {
+		t.Fatalf("expected drift block (lease held), got stdout=%q", stdout)
+	}
+
+	// Corrupt the session file for the current lease owner (s1).
+	sum := sha256.Sum256([]byte("s1"))
+	sessionPath := filepath.Join(root, ".llm-wiki-state", "sessions", hex.EncodeToString(sum[:])+".json")
+	if err := os.WriteFile(sessionPath, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	code = Run([]string{"receipt", "write", "--kind", "synced", "--root", root}, &stdoutBuf, &stderrBuf)
+	if code != 3 {
+		t.Fatalf("exit = %d, want 3 (corrupted session); stdout=%q stderr=%q", code, stdoutBuf.String(), stderrBuf.String())
+	}
+	if stderrBuf.Len() == 0 {
+		t.Fatalf("expected a stderr message for the corrupted session")
+	}
+}
+
 func TestHookNeverBreaksSession(t *testing.T) {
 	// Garbage stdin: one stderr line, exit 0.
 	var stdout, stderr bytes.Buffer
 	code := RunWithStdin(strings.NewReader("not json"), []string{"hook", "stop"}, &stdout, &stderr)
 	if code != 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "llm-wiki") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestHookEventSubcommandMismatch(t *testing.T) {
+	root := t.TempDir()
+	payload := map[string]any{"session_id": "s1", "cwd": root, "hook_event_name": "SessionStart"}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := RunWithStdin(bytes.NewReader(data), []string{"hook", "stop"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code = %d, want 0", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	lines := strings.Split(strings.TrimRight(stderr.String(), "\n"), "\n")
+	if len(lines) != 1 || !strings.Contains(lines[0], "does not match") {
+		t.Fatalf("stderr = %q, want exactly one line containing %q", stderr.String(), "does not match")
+	}
+}
+
+func TestReceiptWriteUsageErrors(t *testing.T) {
+	root := hookFixture(t)
+	longReason := strings.Repeat("a", 501)
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"unknown kind", []string{"receipt", "write", "--kind", "bogus", "--root", root}},
+		{"no-update without reason", []string{"receipt", "write", "--kind", "no-update", "--root", root}},
+		{"no-update reason too long", []string{"receipt", "write", "--kind", "no-update", "--reason", longReason, "--root", root}},
+		{"unknown hook subcommand", []string{"hook", "bogus"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Run(tc.args, &stdout, &stderr)
+			if code != 2 {
+				t.Fatalf("exit = %d, want 2; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
+func TestReceiptWriteRootNotGitRepo(t *testing.T) {
+	root := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"receipt", "write", "--kind", "synced", "--root", root}, &stdout, &stderr)
+	if code != 3 {
+		t.Fatalf("exit = %d, want 3 (not a git repository); stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() == 0 {
+		t.Fatalf("expected a stderr message")
+	}
+}
+
+func TestReceiptWriteValidationGate(t *testing.T) {
+	root := hookFixture(t)
+
+	if _, _, code := runHookCommand(t, root, "session-start", "s1", nil); code != 0 {
+		t.Fatalf("session-start code=%d", code)
+	}
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main // v2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, code := runHookCommand(t, root, "stop", "s1", nil)
+	if code != 0 {
+		t.Fatalf("drift stop code=%d", code)
+	}
+	var block map[string]string
+	if err := json.Unmarshal([]byte(stdout), &block); err != nil || block["decision"] != "block" {
+		t.Fatalf("expected drift block (lease held), got stdout=%q", stdout)
+	}
+
+	// Break wiki validation deterministically: a page with a relative link to
+	// a page that does not exist trips the validator's "broken-link" check.
+	brokenPath := filepath.Join(root, "docs", "llm-wiki", "broken.md")
+	brokenContent := "---\n" +
+		"id: broken.page\n" +
+		"kind: component\n" +
+		"status: current\n" +
+		"summary: Temporary page with a broken link for validation-gate coverage.\n" +
+		"verification:\n" +
+		"  base_commit: abc\n" +
+		"  evidence_fingerprint: sha256:0000000000000000000000000000000000000000000000000000000000000000\n" +
+		"evidence: []\n" +
+		"relations: []\n" +
+		"---\n" +
+		"# Broken\n\n" +
+		"See [Nonexistent](nonexistent-page.md) for details.\n"
+	if err := os.WriteFile(brokenPath, []byte(brokenContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	code = Run([]string{"receipt", "write", "--kind", "synced", "--root", root}, &stdoutBuf, &stderrBuf)
+	if code != 4 {
+		t.Fatalf("exit = %d, want 4 (validation gate); stdout=%q stderr=%q", code, stdoutBuf.String(), stderrBuf.String())
+	}
+
+	if err := os.Remove(brokenPath); err != nil {
+		t.Fatal(err)
+	}
+	stdoutBuf.Reset()
+	stderrBuf.Reset()
+	code = Run([]string{"receipt", "write", "--kind", "synced", "--root", root}, &stdoutBuf, &stderrBuf)
+	if code != 0 || stdoutBuf.Len() != 0 || stderrBuf.Len() != 0 {
+		t.Fatalf("receipt write after fix: code=%d stdout=%q stderr=%q", code, stdoutBuf.String(), stderrBuf.String())
 	}
 }

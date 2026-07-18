@@ -72,6 +72,7 @@ func runReceipt(args []string, stdout, stderr io.Writer) int {
 		time.Duration(cfg.LockWaitSeconds)*time.Second,
 		time.Duration(cfg.SyncLeaseSeconds)*time.Second)
 	if err != nil {
+		// Reachable only if the lease changes owners between CurrentOwner and Acquire.
 		fmt.Fprintln(stderr, "llm-wiki: synchronization lease is held by another session")
 		return 6
 	}
@@ -93,7 +94,11 @@ func runReceipt(args []string, stdout, stderr io.Writer) int {
 	}); err != nil {
 		return commandError(stderr, err)
 	}
-	if session, err := layout.ReadSession(owner); err == nil {
+	session, err := layout.ReadSession(owner)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return commandError(stderr, err)
+	}
+	if err == nil {
 		session.Baseline = current
 		session.StartupAudit = false
 		session.RecoveryPasses = 0
