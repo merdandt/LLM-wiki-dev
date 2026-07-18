@@ -32,7 +32,7 @@ We apply those layers to software repositories:
 | --- | --- |
 | Evidence | Your code, tests, schemas, Git history — read-only to the wiki |
 | Compiled wiki | `docs/llm-wiki/` — committed to Git, owned by the whole team |
-| Rules | `llm-wiki.yaml` + a validator + (soon) hooks that keep it honest |
+| Rules | `llm-wiki.yaml` + a validator + lifecycle hooks that keep it honest |
 
 The wiki is **committed and shared**: when your teammate's agent learns something durable, your agent knows it too after `git pull`. Local caches and bookkeeping stay gitignored.
 
