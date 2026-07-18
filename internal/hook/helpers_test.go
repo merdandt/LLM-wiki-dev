@@ -1,12 +1,15 @@
 package hook
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/merdandt/LLM-wiki-dev/internal/gitrepo"
+	"github.com/merdandt/LLM-wiki-dev/internal/lock"
+	"github.com/merdandt/LLM-wiki-dev/internal/state"
 )
 
 func initializedRepoFixture(t *testing.T) string {
@@ -50,6 +53,11 @@ func discoverRepo(t *testing.T, root string) gitrepo.Repo {
 		t.Fatal(err)
 	}
 	return repo
+}
+
+func lockOwner(root, worktreeID string) (string, error) {
+	layout := state.NewLayout(filepath.Join(root, ".llm-wiki-state"))
+	return lock.CurrentOwner(context.Background(), layout.LockPath(worktreeID))
 }
 
 func writeAndCommit(t *testing.T, root, relative, content string) {

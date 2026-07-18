@@ -1,0 +1,141 @@
+package hook
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/merdandt/LLM-wiki-dev/internal/config"
+	"github.com/merdandt/LLM-wiki-dev/internal/state"
+)
+
+func startSession(t *testing.T, root string) {
+	t.Helper()
+	if _, err := SessionStart(context.Background(), Input{
+		SessionID: "s1", CWD: root, EventName: "SessionStart",
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func materialChange(t *testing.T, root string) {
+	t.Helper()
+	path := filepath.Join(root, "internal", "orders", "service.go")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("package orders\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeMatchingReceipt(t *testing.T, root string) {
+	t.Helper()
+	repo := discoverRepo(t, root)
+	cfg, err := config.Load(filepath.Join(root, "llm-wiki.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := BuildFingerprint(repo, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := state.NewLayout(filepath.Join(root, cfg.StatePath))
+	if err := layout.WriteReceipt(state.Receipt{
+		Kind: state.ReceiptSynced, Fingerprint: current, SessionID: "s1", CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func exhaustRecovery(t *testing.T, root string) {
+	t.Helper()
+	layout := state.NewLayout(filepath.Join(root, ".llm-wiki-state"))
+	session, err := layout.ReadSession("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.RecoveryPasses = 1
+	if err := layout.WriteSession(session); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStopOutcomes(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, root string)
+		input Input
+		want  Outcome
+	}{
+		{name: "stop hook active is silent", setup: func(t *testing.T, root string) {
+			startSession(t, root)
+			materialChange(t, root)
+		}, input: Input{SessionID: "s1", EventName: "Stop", StopHookActive: true}, want: OutcomeClean},
+		{name: "no session is silent", setup: func(t *testing.T, root string) {},
+			input: Input{SessionID: "ghost", EventName: "Stop"}, want: OutcomeClean},
+		{name: "no changes", setup: startSession,
+			input: Input{SessionID: "s1", EventName: "Stop"}, want: OutcomeClean},
+		{name: "material drift blocks", setup: func(t *testing.T, root string) {
+			startSession(t, root)
+			materialChange(t, root)
+		}, input: Input{SessionID: "s1", EventName: "Stop"}, want: OutcomeDrift},
+		{name: "matching receipt is synchronized", setup: func(t *testing.T, root string) {
+			startSession(t, root)
+			materialChange(t, root)
+			writeMatchingReceipt(t, root)
+		}, input: Input{SessionID: "s1", EventName: "Stop"}, want: OutcomeSynchronized},
+		{name: "recovery exhausted warns", setup: func(t *testing.T, root string) {
+			startSession(t, root)
+			materialChange(t, root)
+			exhaustRecovery(t, root)
+		}, input: Input{SessionID: "s1", EventName: "Stop"}, want: OutcomeFailure},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := initializedRepoFixture(t)
+			tt.setup(t, root)
+			input := tt.input
+			input.CWD = root
+			got, err := Stop(context.Background(), input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Outcome != tt.want {
+				t.Fatalf("Outcome = %q, want %q (reason %q)", got.Outcome, tt.want, got.Reason)
+			}
+		})
+	}
+}
+
+func TestStopDriftKeepsLeaseAndIncrementsRecovery(t *testing.T) {
+	root := initializedRepoFixture(t)
+	startSession(t, root)
+	materialChange(t, root)
+	result, err := Stop(context.Background(), Input{SessionID: "s1", CWD: root, EventName: "Stop"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeDrift || result.Reason != DriftReason {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+	layout := state.NewLayout(filepath.Join(root, ".llm-wiki-state"))
+	session, err := layout.ReadSession("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.RecoveryPasses != 1 {
+		t.Fatalf("RecoveryPasses = %d, want 1", session.RecoveryPasses)
+	}
+	repo := discoverRepo(t, root)
+	worktreeID, err := repo.WorktreeID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := lockOwner(root, worktreeID)
+	if err != nil || owner != "s1" {
+		t.Fatalf("lease owner = %q err=%v, want s1 held", owner, err)
+	}
+}
