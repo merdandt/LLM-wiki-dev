@@ -43,8 +43,11 @@ func Stop(ctx context.Context, input Input) (Result, error) {
 	}
 	layout := state.NewLayout(filepath.Join(repo.Root, cfg.StatePath))
 	session, err := layout.ReadSession(input.SessionID)
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
 		return Result{Outcome: OutcomeClean}, nil
+	}
+	if err != nil {
+		return Result{}, err
 	}
 	paths, err := repo.ChangedPaths(session.Baseline.BaseCommit)
 	if err != nil {

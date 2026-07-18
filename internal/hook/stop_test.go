@@ -2,6 +2,8 @@ package hook
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -137,5 +139,19 @@ func TestStopDriftKeepsLeaseAndIncrementsRecovery(t *testing.T) {
 	owner, err := lockOwner(root, worktreeID)
 	if err != nil || owner != "s1" {
 		t.Fatalf("lease owner = %q err=%v, want s1 held", owner, err)
+	}
+}
+
+func TestStopCorruptSessionSurfacesError(t *testing.T) {
+	root := initializedRepoFixture(t)
+	startSession(t, root)
+	stateRoot := filepath.Join(root, ".llm-wiki-state")
+	sum := sha256.Sum256([]byte("s1"))
+	sessionPath := filepath.Join(stateRoot, "sessions", hex.EncodeToString(sum[:])+".json")
+	if err := os.WriteFile(sessionPath, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Stop(context.Background(), Input{SessionID: "s1", CWD: root, EventName: "Stop"}); err == nil {
+		t.Fatal("expected an error for a corrupted session file")
 	}
 }
