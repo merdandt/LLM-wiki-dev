@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/merdandt/LLM-wiki-dev/internal/gitrepo"
 )
 
 func initializedRepoFixture(t *testing.T) string {
@@ -39,4 +41,28 @@ func runGit(t *testing.T, root string, args ...string) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)
 	}
+}
+
+func discoverRepo(t *testing.T, root string) gitrepo.Repo {
+	t.Helper()
+	repo, err := gitrepo.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return repo
+}
+
+func writeAndCommit(t *testing.T, root, relative, content string) {
+	t.Helper()
+	full := filepath.Join(root, filepath.FromSlash(relative))
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, root, "add", ".")
+	runGit(t, root,
+		"-c", "user.name=Hook Test", "-c", "user.email=hook@example.com",
+		"commit", "-qm", "update")
 }
