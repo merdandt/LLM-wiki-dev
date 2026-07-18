@@ -136,6 +136,8 @@ Then use the helper:
 
 The check is deterministic file comparison — no second model, no network. The *judgment* about what knowledge changed is made by the agent already in your repo, under a per-worktree lease so two sessions can't fight over the wiki. Guards cap it at one maintenance pass per turn, and every hook is a silent no-op in repos without the helper binary.
 
+A fresh install starts as an **uncompiled scaffold**: the session-start packet asks the agent to compile the wiki once from your codebase's evidence and run `llm-wiki finalize-init`. Drift enforcement switches on only after that, so the stop hook never nags about a wiki that doesn't have real content yet.
+
 ## How releases are delivered
 
 GitHub Releases hold immutable versioned archives with checksums. A Cloudflare Worker at `llm-wiki-dev.salesshortcut.ai` serves the installer and version manifests, and redirects archive downloads to the matching GitHub release — so any released version stays installable forever via `--version`. Release procedure: `docs/maintenance.md`.

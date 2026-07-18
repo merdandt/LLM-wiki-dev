@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -197,5 +198,25 @@ func TestStopCorruptSessionSurfacesError(t *testing.T) {
 	}
 	if _, err := Stop(context.Background(), Input{SessionID: "s1", CWD: root, EventName: "Stop"}); err == nil {
 		t.Fatal("expected an error for a corrupted session file")
+	}
+}
+
+func TestStopDormantWhileUninitialized(t *testing.T) {
+	root := initializedRepoFixture(t)
+	data, err := os.ReadFile(filepath.Join(root, "llm-wiki.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "initialized: true", "initialized: false", 1)
+	if err := os.WriteFile(filepath.Join(root, "llm-wiki.yaml"), []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	materialChange(t, root)
+	result, err := Stop(context.Background(), Input{SessionID: "s1", CWD: root, EventName: "Stop"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeClean {
+		t.Fatalf("Outcome = %q, want clean while uninitialized", result.Outcome)
 	}
 }

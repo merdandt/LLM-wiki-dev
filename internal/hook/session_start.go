@@ -23,11 +23,23 @@ func SessionStart(_ context.Context, input Input) (Result, error) {
 		return Result{Outcome: OutcomeClean}, nil
 	}
 	cfg, err := config.Load(filepath.Join(repo.Root, "llm-wiki.yaml"))
-	if errors.Is(err, os.ErrNotExist) || (err == nil && !cfg.Initialized) {
+	if errors.Is(err, os.ErrNotExist) {
 		return Result{Outcome: OutcomeClean}, nil
 	}
 	if err != nil {
 		return Result{}, err
+	}
+	if !cfg.Initialized {
+		packet := fmt.Sprintf(
+			"LLM Wiki: %[1]s/ holds a scaffold that is not yet compiled into project memory.\n"+
+				"When convenient this session: read %[1]s/schema.md, replace scaffold pages with evidence-backed content, set each page's verification via `.llm-wiki/llm-wiki fingerprint --page <page>`, run `.llm-wiki/llm-wiki validate`, then `.llm-wiki/llm-wiki finalize-init`.\n"+
+				"Maintenance hooks stay quiet until the wiki is finalized.\n",
+			cfg.WikiPath,
+		)
+		if len(packet) > packetLimit {
+			packet = packet[:packetLimit]
+		}
+		return Result{Outcome: OutcomeClean, Context: packet}, nil
 	}
 	head, err := repo.Head()
 	if err != nil {

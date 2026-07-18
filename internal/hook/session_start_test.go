@@ -2,6 +2,7 @@ package hook
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -87,5 +88,35 @@ func TestSessionStartUnseenCommits(t *testing.T) {
 				t.Fatalf("StartupAudit = %v, want %v", session.StartupAudit, tt.wantAudit)
 			}
 		})
+	}
+}
+
+func TestSessionStartScaffoldEmitsOnboarding(t *testing.T) {
+	root := initializedRepoFixture(t)
+	data, err := os.ReadFile(filepath.Join(root, "llm-wiki.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "initialized: true", "initialized: false", 1)
+	if err := os.WriteFile(filepath.Join(root, "llm-wiki.yaml"), []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := SessionStart(context.Background(), Input{
+		SessionID: "s1", CWD: root, EventName: "SessionStart", Source: "startup",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Context) == 0 || len(result.Context) > 1024 {
+		t.Fatalf("onboarding packet size %d, want 1..1024", len(result.Context))
+	}
+	for _, want := range []string{"not yet compiled", "finalize-init", "docs/llm-wiki"} {
+		if !strings.Contains(result.Context, want) {
+			t.Fatalf("onboarding packet lacks %q:\n%s", want, result.Context)
+		}
+	}
+	layout := state.NewLayout(filepath.Join(root, ".llm-wiki-state"))
+	if _, err := layout.ReadSession("s1"); err == nil {
+		t.Fatal("scaffold session-start must not write session state")
 	}
 }

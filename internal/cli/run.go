@@ -41,13 +41,15 @@ func RunWithStdin(stdin io.Reader, args []string, stdout, stderr io.Writer) int 
 			return runStatus(args[1:], stdout, stderr)
 		case "init":
 			return runInit(args[1:], stdout, stderr)
+		case "finalize-init":
+			return runFinalizeInit(args[1:], stdout, stderr)
 		case "hook":
 			return runHook(stdin, args[1:], stdout, stderr)
 		case "receipt":
 			return runReceipt(args[1:], stdout, stderr)
 		}
 	}
-	fmt.Fprintln(stderr, "usage: llm-wiki <version|init|status|validate|fingerprint|hook|receipt>")
+	fmt.Fprintln(stderr, "usage: llm-wiki <version|init|finalize-init|status|validate|fingerprint|hook|receipt>")
 	return 2
 }
 
