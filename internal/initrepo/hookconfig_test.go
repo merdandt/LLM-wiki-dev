@@ -109,3 +109,57 @@ func TestWriteHookConfigsSkipsMalformed(t *testing.T) {
 		t.Fatal("malformed file was modified")
 	}
 }
+
+func TestWriteHookConfigsSkipsUnexpectedHooksShape(t *testing.T) {
+	root := t.TempDir()
+	claudeDir := filepath.Join(root, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte(`{"hooks": "corrupt"}`)
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+	if err := os.WriteFile(settingsPath, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	warnings, err := WriteHookConfigs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %v, want exactly one about the unexpected hooks shape", warnings)
+	}
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(original) {
+		t.Fatalf("file was modified: got %s, want %s", data, original)
+	}
+}
+
+func TestWriteHookConfigsSkipsUnexpectedEventShape(t *testing.T) {
+	root := t.TempDir()
+	claudeDir := filepath.Join(root, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte(`{"hooks": {"Stop": "not-an-array"}}`)
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+	if err := os.WriteFile(settingsPath, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	warnings, err := WriteHookConfigs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %v, want exactly one about the unexpected hooks shape", warnings)
+	}
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(original) {
+		t.Fatalf("file was modified: got %s, want %s", data, original)
+	}
+}

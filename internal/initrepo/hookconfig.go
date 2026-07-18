@@ -76,13 +76,24 @@ func mergeHookFile(path string, events map[string][]any) (string, error) {
 			return fmt.Sprintf("llm-wiki: %s is not valid JSON; add the LLM Wiki hooks manually", path), nil
 		}
 	}
-	hooks, _ := doc["hooks"].(map[string]any)
-	if hooks == nil {
-		hooks = map[string]any{}
+	hooks := map[string]any{}
+	if raw, present := doc["hooks"]; present {
+		asserted, ok := raw.(map[string]any)
+		if !ok {
+			return fmt.Sprintf("llm-wiki: %s has an unexpected hooks shape; add the LLM Wiki hooks manually", path), nil
+		}
+		hooks = asserted
 	}
 	changed := false
 	for event, entries := range events {
-		existing, _ := hooks[event].([]any)
+		var existing []any
+		if raw, present := hooks[event]; present {
+			asserted, ok := raw.([]any)
+			if !ok {
+				return fmt.Sprintf("llm-wiki: %s has an unexpected hooks shape; add the LLM Wiki hooks manually", path), nil
+			}
+			existing = asserted
+		}
 		if containsMarker(existing) {
 			continue
 		}
